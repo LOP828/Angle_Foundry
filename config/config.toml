@@ -1,0 +1,18 @@
+[schedule]
+enabled = true
+cron = "30 8 * * *"
+
+[generator]
+topics = ["理财", "AI使用", "社会观察"]
+directions = ["坑", "盲区", "痛点", "疑问", "跨界话题"]
+count_per_direction = 2
+
+[push]
+provider = "feishu"
+webhook = "https://your-webhook-url"
+
+[ai]
+model = "your-model-name"
+base_url = "https://your-api-base-url"
+timeout_seconds = 60
+max_retries = 2
