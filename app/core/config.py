@@ -9,6 +9,15 @@ from typing import Any
 from app.models import AppConfig
 
 DEFAULT_CONFIG_PATH = Path("config/config.toml")
+ENV_OVERRIDE_FIELDS = {
+    "ANGLE_FOUNDRY_AI_MODEL": "ai_model",
+    "ANGLE_FOUNDRY_AI_BASE_URL": "ai_base_url",
+    "ANGLE_FOUNDRY_AI_TIMEOUT_SECONDS": "ai_timeout_seconds",
+    "ANGLE_FOUNDRY_AI_MAX_RETRIES": "ai_max_retries",
+    "FEISHU_WEBHOOK": "push_webhook",
+    "ANGLE_FOUNDRY_API_KEY": "ai_api_key",
+}
+INT_OVERRIDE_FIELDS = {"ai_timeout_seconds", "ai_max_retries"}
 
 
 def _read_toml(path: Path) -> dict[str, Any]:
@@ -16,7 +25,7 @@ def _read_toml(path: Path) -> dict[str, Any]:
         return tomllib.load(file)
 
 
-def _flatten_config(data: dict[str, Any], api_key: str) -> dict[str, Any]:
+def _flatten_config(data: dict[str, Any]) -> dict[str, Any]:
     schedule = data.get("schedule", {})
     generator = data.get("generator", {})
     push = data.get("push", {})
@@ -34,8 +43,23 @@ def _flatten_config(data: dict[str, Any], api_key: str) -> dict[str, Any]:
         "ai_base_url": ai.get("base_url"),
         "ai_timeout_seconds": ai.get("timeout_seconds"),
         "ai_max_retries": ai.get("max_retries"),
-        "ai_api_key": api_key,
+        "ai_api_key": ai.get("api_key"),
     }
+
+
+def _apply_env_overrides(flat_config: dict[str, Any]) -> dict[str, Any]:
+    overrides = dict(flat_config)
+    for env_name, field_name in ENV_OVERRIDE_FIELDS.items():
+        env_value = os.getenv(env_name)
+        if env_value is None or env_value == "":
+            continue
+
+        if field_name in INT_OVERRIDE_FIELDS:
+            overrides[field_name] = int(env_value)
+        else:
+            overrides[field_name] = env_value
+
+    return overrides
 
 
 def load_config(config_path: str | Path | None = None) -> AppConfig:
@@ -43,12 +67,10 @@ def load_config(config_path: str | Path | None = None) -> AppConfig:
     if not path.exists():
         raise FileNotFoundError(f"Config file not found: {path}")
 
-    api_key = os.getenv("ANGLE_FOUNDRY_API_KEY")
-    if not api_key:
-        raise ValueError("Environment variable ANGLE_FOUNDRY_API_KEY is required.")
-
     data = _read_toml(path)
-    return AppConfig.model_validate(_flatten_config(data, api_key=api_key))
+    flat_config = _flatten_config(data)
+    resolved_config = _apply_env_overrides(flat_config)
+    return AppConfig.model_validate(resolved_config)
 
 
 @lru_cache(maxsize=1)

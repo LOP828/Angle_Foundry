@@ -45,6 +45,17 @@ Default values come from `config/config.toml`. The following environment variabl
 
 If an override variable is absent, the app falls back to the value in `config/config.toml`.
 
+PowerShell example:
+
+```powershell
+$env:ANGLE_FOUNDRY_API_KEY = "your-api-key"
+$env:ANGLE_FOUNDRY_AI_BASE_URL = "https://your-ai-endpoint/v1"
+$env:ANGLE_FOUNDRY_AI_MODEL = "your-model"
+$env:ANGLE_FOUNDRY_AI_TIMEOUT_SECONDS = "30"
+$env:ANGLE_FOUNDRY_AI_MAX_RETRIES = "1"
+$env:FEISHU_WEBHOOK = "https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook"
+```
+
 ## Run Once
 
 ```bash
