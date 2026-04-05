@@ -3,13 +3,22 @@ from __future__ import annotations
 from app.models import TopicRequest
 
 
-def build_prompt(request: TopicRequest) -> str:
+def build_prompt(
+    request: TopicRequest, recent_titles: list[str] | None = None
+) -> str:
     directions = "、".join(request.directions)
     style_rules = (
         "\n".join(f"- {rule}" for rule in request.style_rules)
         if request.style_rules
         else "- 标题要具体、清晰、可直接作为文章选题"
     )
+    recent_titles_block = ""
+    if recent_titles:
+        recent_title_lines = "\n".join(f"- {title}" for title in recent_titles)
+        recent_titles_block = (
+            "以下标题最近已推送，禁止重复生成：\n"
+            f"{recent_title_lines}\n"
+        )
     json_shape = ",\n".join(
         f'    "{direction}": ["题目1", "题目2"]' for direction in request.directions
     )
@@ -29,6 +38,7 @@ def build_prompt(request: TopicRequest) -> str:
         "  }\n"
         "}\n"
         "只返回 JSON 本体，不要附加任何解释，不要使用 Markdown，不要使用 ```json 代码块。\n"
+        f"{recent_titles_block}"
         "标题风格要求：\n"
         f"{style_rules}\n"
     )

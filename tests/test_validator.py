@@ -121,3 +121,36 @@ def test_validate_topic_result_rejects_equal_counts_when_not_matching_expected_c
     assert result.errors.count("痛点 must contain 2 items, got 1.") == 1
     assert result.errors.count("疑问 must contain 2 items, got 1.") == 1
     assert result.errors.count("跨界话题 must contain 2 items, got 1.") == 1
+
+
+def test_validate_topic_result_rejects_title_duplicated_from_yesterday_history() -> None:
+    result = validate_topic_result(
+        make_result(),
+        expected_count=2,
+        recent_titles=["很多人忽略的现金流盲区"],
+    )
+
+    assert result.is_valid is False
+    assert "[history_duplicate] 盲区[1] duplicates a recent title." in result.errors
+
+
+def test_validate_topic_result_rejects_title_with_only_punctuation_difference() -> None:
+    result = validate_topic_result(
+        make_result(),
+        expected_count=2,
+        recent_titles=["理财 × 短视频:为什么越刷越想买"],
+    )
+
+    assert result.is_valid is False
+    assert "[history_duplicate] 跨界话题[1] duplicates a recent title." in result.errors
+
+
+def test_validate_topic_result_does_not_false_positive_when_recent_titles_is_empty() -> None:
+    result = validate_topic_result(
+        make_result(),
+        expected_count=2,
+        recent_titles=[],
+    )
+
+    assert result.is_valid is True
+    assert result.errors == []

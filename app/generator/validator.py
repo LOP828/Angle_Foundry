@@ -3,6 +3,34 @@ from __future__ import annotations
 from app.models import AppConfig
 from app.models import TopicResult
 
+_PUNCT_TRANSLATION = str.maketrans(
+    {
+        "，": ",",
+        "。": ".",
+        "！": "!",
+        "？": "?",
+        "；": ";",
+        "：": ":",
+        "“": '"',
+        "”": '"',
+        "‘": "'",
+        "’": "'",
+        "（": "(",
+        "）": ")",
+        "【": "[",
+        "】": "]",
+        "《": "<",
+        "》": ">",
+        "〈": "<",
+        "〉": ">",
+        "、": ",",
+        "—": "-",
+        "…": "...",
+        "·": ".",
+        "×": "x",
+    }
+)
+
 
 def _has_cross_topic_signal(item: str) -> bool:
     signal_tokens = (
@@ -53,9 +81,24 @@ def _has_cross_topic_signal(item: str) -> bool:
     )
 
 
-def validate_topic_result(result: TopicResult, expected_count: int) -> TopicResult:
+def _normalize_title(value: str) -> str:
+    return value.strip().translate(_PUNCT_TRANSLATION).casefold()
+
+
+def validate_topic_result(
+    result: TopicResult,
+    expected_count: int,
+    recent_titles: list[str] | None = None,
+) -> TopicResult:
     errors: list[str] = []
     allowed_directions = list(AppConfig.allowed_directions)
+    recent_title_set = {
+        normalized
+        for title in (recent_titles or [])
+        if isinstance(title, str)
+        for normalized in [_normalize_title(title)]
+        if normalized
+    }
 
     if expected_count <= 0:
         raise ValueError("expected_count must be greater than 0.")
@@ -90,6 +133,12 @@ def validate_topic_result(result: TopicResult, expected_count: int) -> TopicResu
         for index, item in enumerate(items, start=1):
             if not isinstance(item, str) or not item.strip():
                 errors.append(f"{direction}[{index}] must be a non-empty string.")
+                continue
+
+            if _normalize_title(item) in recent_title_set:
+                errors.append(
+                    f"[history_duplicate] {direction}[{index}] duplicates a recent title."
+                )
 
     cross_items = result.items_by_direction.get("跨界话题", [])
     if isinstance(cross_items, list):

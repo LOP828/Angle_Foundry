@@ -34,15 +34,16 @@ Main config file:
 
 - `config/config.toml`
 
-Required environment variable:
+Default values come from `config/config.toml`. The following environment variables override TOML when present:
 
 - `ANGLE_FOUNDRY_API_KEY`
-
-Real delivery also needs:
-
 - `ANGLE_FOUNDRY_AI_BASE_URL`
 - `ANGLE_FOUNDRY_AI_MODEL`
+- `ANGLE_FOUNDRY_AI_TIMEOUT_SECONDS`
+- `ANGLE_FOUNDRY_AI_MAX_RETRIES`
 - `FEISHU_WEBHOOK`
+
+If an override variable is absent, the app falls back to the value in `config/config.toml`.
 
 ## Run Once
 
@@ -58,6 +59,7 @@ Expected result:
 
 - Console prints per-topic progress and a final `Run-once summary`
 - Log file is written to `logs/angle_foundry.log`
+- Successful titles are appended to `logs/topic_history.jsonl` for next-run dedupe
 - Exit code is `0` on full success, `1` if any topic fails
 
 ## Default Scheduler Mode
@@ -94,3 +96,4 @@ UV_CACHE_DIR=.uv-cache uv run python scripts/smoke_real_delivery.py
 ## Manual Verification
 
 Detailed manual verification and scheduler proof steps are documented in [manual-verification.md](/mnt/d/project/Angle_Foundry/docs/manual-verification.md).
+That document also covers `logs/topic_history.jsonl`, how `recent_titles` is applied, and the meaning of `[history_duplicate]`.

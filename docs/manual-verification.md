@@ -49,6 +49,35 @@ Failure triage:
 - Feishu send failure: check `FEISHU_WEBHOOK` and returned platform code
 - Validation failure: inspect raw AI text and the logged error in the summary
 
+## 1.1 History Dedup Verification Notes
+
+History file:
+
+- Successful pushes are appended to `logs/topic_history.jsonl`
+- Each JSONL record keeps only `date`, `topic`, `direction`, `title`
+
+How `recent_titles` takes effect:
+
+- At task start, the app loads titles from the most recent 1 day of `logs/topic_history.jsonl`
+- Those titles are passed into `prompt_builder` as `recent_titles`, so the prompt explicitly tells the model not to regenerate them
+- The same `recent_titles` list is also passed into the validator for exact history duplicate checks
+- After a successful push, the newly sent titles are appended back into `logs/topic_history.jsonl`
+
+Meaning of `[history_duplicate]`:
+
+- This validator error means a generated title matches a recent history title after normalization
+- Normalization currently trims leading and trailing spaces, normalizes Chinese and English punctuation, and lowercases before comparison
+- When this error appears, the task treats it as a validation failure and retries once
+
+How to do a next-day `--run-once` verification:
+
+1. Run one successful `--run-once` execution and confirm `logs/topic_history.jsonl` was created.
+2. Open `logs/topic_history.jsonl` and keep one known title as yesterday's record by changing its `date` field to the previous calendar day.
+3. Run `UV_CACHE_DIR=.uv-cache uv run python -m app.main --run-once` again with the same topic configuration.
+4. Confirm the prompt path uses recent history and the run does not reuse the seeded title.
+5. If the first generation still hits the same title, confirm logs show a validation failure containing `[history_duplicate]` and then one retry.
+6. Confirm the final successful titles are appended as new JSONL lines in `logs/topic_history.jsonl`.
+
 ## 2. Minimal Scheduler Verification
 
 Goal: prove default mode can trigger one scheduled execution.
