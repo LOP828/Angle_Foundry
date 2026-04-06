@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from datetime import datetime
 import logging
 from pathlib import Path
 
+from apscheduler.triggers.cron import CronTrigger
+
 from app.core.logger import setup_logger
+from app.core.scheduler import _should_run_startup_catchup
 from app.core.scheduler import start_scheduler
+from app.core.single_instance import SingleInstanceError
 from app.main import main
 from app.models import AppConfig
 
@@ -110,6 +115,7 @@ def test_main_default_mode_starts_scheduler(monkeypatch) -> None:
 
     monkeypatch.setattr("app.main.load_config", lambda path: config)
     monkeypatch.setattr("app.main.setup_logger", lambda level: logging.getLogger("main"))
+    monkeypatch.setattr("app.main.SchedulerInstanceLock", DummyLock)
     monkeypatch.setattr(
         "app.main.start_scheduler",
         lambda cfg, logger=None: calls.append("started"),
@@ -117,6 +123,14 @@ def test_main_default_mode_starts_scheduler(monkeypatch) -> None:
 
     assert main([]) == 0
     assert calls == ["started"]
+
+
+class DummyLock:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return None
 
 
 def test_start_scheduler_returns_none_when_disabled() -> None:
@@ -128,3 +142,87 @@ def test_start_scheduler_returns_none_when_disabled() -> None:
     )
 
     assert scheduler is None
+
+
+def test_main_default_mode_returns_one_when_scheduler_lock_is_taken(monkeypatch) -> None:
+    config = make_config()
+
+    class FailingLock:
+        def __enter__(self):
+            raise SingleInstanceError("lock taken")
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+    monkeypatch.setattr("app.main.load_config", lambda path: config)
+    monkeypatch.setattr("app.main.setup_logger", lambda level: logging.getLogger("main"))
+    monkeypatch.setattr("app.main.SchedulerInstanceLock", FailingLock)
+
+    assert main([]) == 1
+
+
+def test_start_scheduler_runs_startup_catchup_after_missed_time() -> None:
+    config = make_config().model_copy(update={"schedule_cron": "0 10 * * *"})
+    events: dict[str, object] = {"run_count": 0}
+
+    class FakeScheduler:
+        def add_job(self, func, trigger, id, replace_existing):
+            events["id"] = id
+            events["trigger"] = str(trigger)
+
+        def start(self):
+            events["started"] = True
+
+    scheduler = start_scheduler(
+        config,
+        logger=logging.getLogger("scheduler_catchup_test"),
+        scheduler_factory=FakeScheduler,
+        task_runner=lambda cfg, logger=None: events.__setitem__(
+            "run_count", int(events["run_count"]) + 1
+        ),
+        history_checker=lambda day=None: False,
+        now=datetime(2026, 4, 6, 10, 2),
+    )
+
+    assert isinstance(scheduler, FakeScheduler)
+    assert events["run_count"] == 1
+    assert events["started"] is True
+
+
+def test_start_scheduler_skips_startup_catchup_when_today_already_sent() -> None:
+    config = make_config().model_copy(update={"schedule_cron": "0 10 * * *"})
+    events: dict[str, object] = {"run_count": 0}
+
+    class FakeScheduler:
+        def add_job(self, func, trigger, id, replace_existing):
+            events["id"] = id
+
+        def start(self):
+            events["started"] = True
+
+    scheduler = start_scheduler(
+        config,
+        logger=logging.getLogger("scheduler_no_catchup_test"),
+        scheduler_factory=FakeScheduler,
+        task_runner=lambda cfg, logger=None: events.__setitem__(
+            "run_count", int(events["run_count"]) + 1
+        ),
+        history_checker=lambda day=None: True,
+        now=datetime(2026, 4, 6, 10, 2),
+    )
+
+    assert isinstance(scheduler, FakeScheduler)
+    assert events["run_count"] == 0
+    assert events["started"] is True
+
+
+def test_should_run_startup_catchup_returns_false_before_scheduled_time() -> None:
+    trigger = CronTrigger.from_crontab("0 10 * * *")
+
+    should_run = _should_run_startup_catchup(
+        trigger=trigger,
+        history_checker=lambda day=None: False,
+        now=datetime(2026, 4, 6, 9, 59, tzinfo=trigger.timezone),
+    )
+
+    assert should_run is False

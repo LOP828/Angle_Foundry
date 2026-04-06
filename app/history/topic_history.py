@@ -62,6 +62,30 @@ def load_recent_titles(
     return titles
 
 
+def has_history_for_day(
+    *,
+    day: date | None = None,
+    path: str | Path = DEFAULT_HISTORY_PATH,
+) -> bool:
+    history_path = Path(path)
+    if not history_path.exists():
+        return False
+
+    target_day = day or date.today()
+
+    with history_path.open("r", encoding="utf-8") as file:
+        for line in file:
+            record = _parse_history_line(line)
+            if record is None:
+                continue
+
+            record_date = _parse_record_date(record.get("date"))
+            if record_date == target_day:
+                return True
+
+    return False
+
+
 def _normalize_date(value: date | str) -> str:
     if isinstance(value, date):
         return value.isoformat()

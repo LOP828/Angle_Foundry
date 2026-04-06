@@ -1,6 +1,6 @@
 [schedule]
 enabled = true
-cron = "30 8 * * *"
+cron = "0 10 * * *"
 
 [generator]
 topics = ["理财", "AI使用", "社会观察"]

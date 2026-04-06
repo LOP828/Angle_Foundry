@@ -83,7 +83,65 @@ export FEISHU_WEBHOOK="https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook
 UV_CACHE_DIR=.uv-cache uv run python -m app.main
 ```
 
-The app starts a blocking scheduler and waits for the configured cron to trigger `daily_topic_task`.
+The app starts a blocking scheduler and waits for the configured cron to trigger `daily_topic_task`. The default config in this repo is `0 10 * * *` (10:00 every day).
+
+## Windows Quick Start
+
+If you already stored the required values as User or Machine environment variables in Windows, you can start the app without manually re-exporting them every time.
+
+Run once:
+
+```powershell
+.\scripts\run_once.ps1
+```
+
+Start the scheduler:
+
+```powershell
+.\scripts\start_scheduler.ps1
+```
+
+Double-click entrypoints are also available:
+
+- `scripts\run_once.bat`
+- `scripts\start_scheduler.bat`
+
+These scripts load the following variables from Process, then User, then Machine scope:
+
+- `ANGLE_FOUNDRY_API_KEY`
+- `ANGLE_FOUNDRY_AI_BASE_URL`
+- `ANGLE_FOUNDRY_AI_MODEL`
+- `FEISHU_WEBHOOK`
+
+## Windows Auto Start
+
+This repo includes Task Scheduler helpers for starting the blocking scheduler automatically when you log into Windows.
+
+Register the startup task:
+
+```powershell
+.\scripts\register_startup_task.ps1
+```
+
+Check task status:
+
+```powershell
+.\scripts\show_startup_task.ps1
+```
+
+Remove the startup task:
+
+```powershell
+.\scripts\unregister_startup_task.ps1
+```
+
+Batch wrappers are also available:
+
+- `scripts\register_startup_task.bat`
+- `scripts\show_startup_task.bat`
+- `scripts\unregister_startup_task.bat`
+
+The task runs for the current Windows user at logon and launches `scripts\start_scheduler.ps1` in a hidden PowerShell window.
 
 ## Real Smoke Test
 

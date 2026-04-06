@@ -6,6 +6,8 @@ import logging
 from app.core.config import load_config
 from app.core.logger import setup_logger
 from app.core.scheduler import start_scheduler
+from app.core.single_instance import SchedulerInstanceLock
+from app.core.single_instance import SingleInstanceError
 from app.tasks.daily_topic_task import run_daily_topic_task
 
 
@@ -35,7 +37,13 @@ def main(argv: list[str] | None = None) -> int:
         logger.info("Run-once summary: %s", summary)
         return 0 if int(summary["failure_count"]) == 0 else 1
 
-    start_scheduler(config, logger=logger)
+    try:
+        with SchedulerInstanceLock():
+            start_scheduler(config, logger=logger)
+    except SingleInstanceError as exc:
+        logger.error("%s", exc)
+        return 1
+
     return 0
 
 
